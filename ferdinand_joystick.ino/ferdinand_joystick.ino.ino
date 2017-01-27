@@ -42,13 +42,17 @@ void setup() {
 }
 
 int8_t readSensor(uint8_t id) {
+	#ifdef debug
+	DigiKeyboard.delay(10);
+	#else
 	DigiJoystick.delay(10);
+	#endif
 	uint32_t rawData;
 	digitalWrite(pingOut, HIGH);
 	delayMicroseconds(50);
 	digitalWrite(pingOut, LOW);
-	rawData[id] = (rawData[id] >> 1) + pulseIn(sensors[id], HIGH, 40000);
-	return map(rawData[id], calibrationIn[id][0], calibrationIn[id][1], calibrationOut[id][0], calibrationOut[id][1]);
+	avgData[id] = (avgData[id] >> 1) + pulseIn(sensors[id], HIGH, 40000);
+	return map(avgData[id], calibrationIn[id][0], calibrationIn[id][1], calibrationOut[id][0], calibrationOut[id][1]);
 }
 
 
