@@ -19,6 +19,7 @@ static const int8_t calibrationOut[sizeof(sensors)][2] = {
 	{0, 127},
 	{0, -128}
 };
+uint32_t avgData[sizeof(sensors)];
 
 uint8_t data[8] = {128, 128, 128, 128, 128, 128, 0, 0};
 enum dataPos {
@@ -46,8 +47,8 @@ int8_t readSensor(uint8_t id) {
 	digitalWrite(pingOut, HIGH);
 	delayMicroseconds(50);
 	digitalWrite(pingOut, LOW);
-	rawData = pulseIn(sensors[id], HIGH, 40000);
-	return map(rawData, calibrationIn[id][0], calibrationIn[id][1], calibrationOut[id][0], calibrationOut[id][1]);
+	rawData[id] = (rawData[id] >> 1) + pulseIn(sensors[id], HIGH, 40000);
+	return map(rawData[id], calibrationIn[id][0], calibrationIn[id][1], calibrationOut[id][0], calibrationOut[id][1]);
 }
 
 
