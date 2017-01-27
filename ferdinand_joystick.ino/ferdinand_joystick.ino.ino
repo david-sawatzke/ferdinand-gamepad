@@ -52,9 +52,22 @@ int8_t readSensor(uint8_t id) {
 
 
 void loop() {
-
-	DigiJoystick.setX((byte) readSensor(0));
-	DigiJoystick.setY((uint8_t)(readSensor(1) + readSensor(2)));
+	uint8_t x = (uint8_t) readSensor(0);
+	int8_t y1 = (int8_t)(readSensor(1));
+	int8_t y2 = (int8_t)(readSensor(2));
+	#ifdef debug
+	DigiKeyboard.print("\n");
+	DigiKeyboard.print(x);
+	DigiKeyboard.print(" ");
+	DigiKeyboard.print(y1);
+	DigiKeyboard.print(" ");
+	DigiKeyboard.print(y2);
+	DigiKeyboard.delay(500); // wait 50 milliseconds
+	#else
+	DigiJoystick.setX(x);
+	DigiJoystick.setY(y1 + y2);
+	DigiJoystick.delay(50); // wait 50 milliseconds
+	#endif
 
 	// If not using plentiful DigiJoystick.delay() calls, make sure to
 	//DigiJoystick.update(); // call this at least every 50ms
@@ -79,7 +92,6 @@ void loop() {
 	// it's best to use DigiJoystick.delay() because it knows how to talk to
 	// the connected computer - otherwise the USB link can crash with the
 	// regular arduino delay() function
-	DigiJoystick.delay(50); // wait 50 milliseconds
 
 	// we can also set buttons like this (lowByte, highByte)
 	//DigiJoystick.setButtons(0x00, 0x00);
