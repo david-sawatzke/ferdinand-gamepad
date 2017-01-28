@@ -52,7 +52,11 @@ int8_t readSensor(uint8_t id) {
 	delayMicroseconds(50);
 	digitalWrite(pingOut, LOW);
 	avgData[id] = (avgData[id] >> 1) + pulseIn(sensors[id], HIGH, 40000);
+	#ifdef debug
+	return 0;
+	#else
 	return map(avgData[id], calibrationIn[id][0], calibrationIn[id][1], calibrationOut[id][0], calibrationOut[id][1]);
+	#endif
 }
 
 
@@ -62,15 +66,15 @@ void loop() {
 	int8_t y2 = (int8_t)(readSensor(2));
 	#ifdef debug
 	DigiKeyboard.print("\n");
-	DigiKeyboard.print(x);
+	DigiKeyboard.print(avgData[0]);
 	DigiKeyboard.print(" ");
-	DigiKeyboard.print(y1);
+	DigiKeyboard.print(avgData[1]);
 	DigiKeyboard.print(" ");
-	DigiKeyboard.print(y2);
-	DigiKeyboard.delay(500); // wait 50 milliseconds
+	DigiKeyboard.print(avgData[2]);
+	DigiKeyboard.delay(200); // wait 50 milliseconds
 	#else
-	DigiJoystick.setX(x);
-	DigiJoystick.setY(y1 + y2);
+	DigiJoystick.setX((byte) x);
+	DigiJoystick.setY((byte)(y1 + y2));
 	DigiJoystick.delay(50); // wait 50 milliseconds
 	#endif
 
