@@ -6,11 +6,11 @@
 #else
 #include "DigiJoystick.h"
 #endif
-static const uint8_t sensors[] = {2, 0, 5};
-static const uint8_t pingOut = 1;
+static const uint8_t sensors[] = {0, 2, 1};
+static const uint8_t pingOut = 5;
 
 static const uint32_t calibrationIn[sizeof(sensors)][2] = {
-	{200, 30000},
+	{1600, 3800},
 	{200, 30000},
 	{200, 30000}
 };
