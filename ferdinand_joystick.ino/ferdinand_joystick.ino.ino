@@ -1,70 +1,97 @@
+// This arduino sketch should run on the digispark.
+// It's an attiny85 with the micronucleus bootloader
+// You should check the digispark website, so you can select the right
+// board in the arduino ise
+
 // Debug
-#define debug
+// If debug is defined, the averaged but not mapped values are 
+// typed (the device functions like a keyboard). Just use an editor 
+// with an empty file as the display
+// This is intended for calibrating
+//#define debug
 
 #ifdef debug
 #include "DigiKeyboard.h"
 #else
 #include "DigiJoystick.h"
 #endif
-static const uint8_t sensors[] = {0, 2, 1};
+
+// The sensor inputs:
+// steeringWheel, throttle, break
+static const uint8_t sensors[] = {0, 1, 2};
 static const uint8_t pingOut = 5;
 
+// The maximum and minimum of of the input values
+// You need to calibrate this
+// WARNING: If the input value is bigger or smaller than the max values,
+//          the map function wraps around. Be sure to test properly and
+//          ideally have a bit of wiggle room
 static const uint32_t calibrationIn[sizeof(sensors)][2] = {
-	{1600, 3800},
-	{200, 30000},
-	{200, 30000}
+  // Values for the steering wheel
+	{1450, 3900},
+  // Values for the throttle pedal
+	{3300, 5100},
+  // Values for the break pedal
+	{3100, 4500}
 };
-static const int8_t calibrationOut[sizeof(sensors)][2] = {
-	{-128, 127},
-	{0, 127},
-	{0, -128}
+
+// The values the input values are mapped to
+// 128 is center
+static const uint8_t calibrationOut[sizeof(sensors)][2] = {
+  // Values for the steering wheel
+	{0, 255},
+  // Values for the throttle pedal
+  // center the value when throttle isn't pressed
+	{128, 255},
+  // Values for the break pedal
+  // Substract this values from throttle, so when it's fully
+  // pressed and throttle isn't, the resulting value is 0
+	{0, 128}
 };
+
 uint32_t avgData[sizeof(sensors)];
 
-uint8_t data[8] = {128, 128, 128, 128, 128, 128, 0, 0};
-enum dataPos {
-	x = 0,
-	y = 1,
-	xrot = 2,
-	yrot = 3,
-	zrot = 4,
-	slider = 5,
-	buttonLowByte = 6,
-	buttonHighByte = 7
-};
-
 void setup() {
-	// Do nothing? It seems as if the USB hardware is ready to go on reset
+	// USB doesn't need to be initialized
+  // Set ping out to output
 	pinMode(pingOut, OUTPUT);
+  // Set the sensor inputs as an input
 	for (uint8_t i = 0; i < sizeof(sensors); i++) {
 		pinMode(sensors[i], INPUT);
 	}
 }
 
-int8_t readSensor(uint8_t id) {
+uint8_t readSensor(uint8_t id) {
+  // The special delay functions also handle the usb connections
+  // The sensors don't like beeing activated so fast, so we just wait 5 milliseconds
 	#ifdef debug
-	DigiKeyboard.delay(10);
+	DigiKeyboard.delay(5);
 	#else
-	DigiJoystick.delay(10);
+	DigiJoystick.delay(5);
 	#endif
-	uint32_t rawData;
+	// Start the measurment with a pulse to pingOut
 	digitalWrite(pingOut, HIGH);
 	delayMicroseconds(50);
 	digitalWrite(pingOut, LOW);
-	avgData[id] = (avgData[id] >> 1) + pulseIn(sensors[id], HIGH, 40000);
+  // Measure the pulse (high) with timeout and average it
+	avgData[id] = (avgData[id] >> 1) + pulseIn(sensors[id], HIGH, 6000);
 	#ifdef debug
+  // As the return type is too small, the debug just reads directly from the avgData array
 	return 0;
 	#else
+  // Map the input values to the calibrated values
 	return map(avgData[id], calibrationIn[id][0], calibrationIn[id][1], calibrationOut[id][0], calibrationOut[id][1]);
 	#endif
 }
 
 
 void loop() {
-	uint8_t x = (uint8_t) readSensor(0);
-	int8_t y1 = (int8_t)(readSensor(1));
-	int8_t y2 = (int8_t)(readSensor(2));
+	uint8_t steeringWheel =  readSensor(0);
+	uint8_t throttlePedal = readSensor(1);
+	uint8_t breakPedal = readSensor(2);
 	#ifdef debug
+  // As there isn't a serial port, just output debug data as a keyboard
+  // (gnuplot likes space seperated values)
 	DigiKeyboard.print("\n");
 	DigiKeyboard.print(avgData[0]);
 	DigiKeyboard.print(" ");
@@ -73,35 +100,10 @@ void loop() {
 	DigiKeyboard.print(avgData[2]);
 	DigiKeyboard.delay(200); // wait 50 milliseconds
 	#else
-	DigiJoystick.setX((byte) x);
-	DigiJoystick.setY((byte)(y1 + y2));
-	DigiJoystick.delay(50); // wait 50 milliseconds
+	DigiJoystick.setX((byte) steeringWheel);
+  // throttle and break are on the same axis and can cancel each other out
+	DigiJoystick.setY((byte)(throttlePedal - breakPedal));
+  // Can't hurt
+	DigiJoystick.delay(20); // wait 50 milliseconds
 	#endif
-
-	// If not using plentiful DigiJoystick.delay() calls, make sure to
-	//DigiJoystick.update(); // call this at least every 50ms
-	// calling more often than that is fine
-	// this will actually only send the data every once in a while unless the data is different
-
-	// you can set the values from a raw byte array with:
-	// char myBuf[8] = {
-	//   x, y, xrot, yrot, zrot, slider,
-	//   buttonLowByte, buttonHighByte
-	// };
-	// DigiJoystick.setValues(myBuf);
-
-	// Or we can also set values like this:
-	//DigiJoystick.setX((byte) (millis() / 100)); // scroll X left to right repeatedly
-	//DigiJoystick.setY((byte) 0x30);
-	//DigiJoystick.setXROT((byte) 0x60);
-	//DigiJoystick.setYROT((byte) 0x90);
-	//DigiJoystick.setZROT((byte) 0xB0);
-	//DigiJoystick.setSLIDER((byte) 0xF0);
-
-	// it's best to use DigiJoystick.delay() because it knows how to talk to
-	// the connected computer - otherwise the USB link can crash with the
-	// regular arduino delay() function
-
-	// we can also set buttons like this (lowByte, highByte)
-	//DigiJoystick.setButtons(0x00, 0x00);
 }
