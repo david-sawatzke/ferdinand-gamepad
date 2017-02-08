@@ -62,7 +62,7 @@ void setup() {
 	pinMode(pingOut, OUTPUT);
 	// Set the sensor inputs as an input
 	for (uint8_t i = 0; i < sizeof(sensors); i++) {
-		pinMode(sensors[i], INPUT);
+		pinMode(sensors[i], INPUT_PULLUP);
 	}
 }
 
@@ -79,20 +79,20 @@ uint16_t *readSensor(void) {
 	// Begin Timeout
 	timeout_begin = micros();
 	// Stop when either all sensors have been measures or the timeout was reached
-	while((time[0] == 0 || time[1] == 0 || time[2] == 0) && ((micros() - timeout_begin) < timeout)) {
-		if (begin[0] == 0 && digitalRead(sensors[0]) == true) {
+	while(((time[0] == 0) || (time[1] == 0) || (time[2] == 0)) && ((micros() - timeout_begin) < timeout)) {
+		if ((begin[0] == 0) && (digitalRead(sensors[0]) == true)) {
 			begin[0] = micros();
-		} else if (begin[0] == 0 && time[0] == 0 && digitalRead(sensors[0]) == false) {
+		} else if ((begin[0] == 0) && (time[0] == 0 )&& (digitalRead(sensors[0]) == false)) {
 			time[0] = micros() - begin[0];
 		}
-		if (begin[1] == 0 && digitalRead(sensors[1]) == true) {
+		if ((begin[1] == 0) && (digitalRead(sensors[1]) == true)) {
 			begin[1] = micros();
-		} else if (begin[1] == 0 && time[1] == 0 && digitalRead(sensors[1]) == false) {
+		} else if ((begin[1] == 0) && (time[1] == 0 )&& (digitalRead(sensors[1]) == false)) {
 			time[1] = micros() - begin[1];
 		}
-		if (begin[2] == 0 && digitalRead(sensors[2]) == true) {
+		if ((begin[2] == 0) && (digitalRead(sensors[2]) == true)) {
 			begin[2] = micros();
-		} else if (begin[2] == 0 && time[2] == 0 && digitalRead(sensors[2]) == false) {
+		} else if ((begin[2] == 0) && (time[2] == 0 )&& (digitalRead(sensors[2]) == false)) {
 			time[2] = micros() - begin[2];
 		}
 	}
