@@ -1,7 +1,9 @@
 // This arduino sketch should run on the digispark.
 // It's an attiny85 with the micronucleus bootloader
 // You should check the digispark website, so you can select the right
-// board in the arduino ise
+// board in the arduino ide
+
+// https://github.com/MHeironimus/ArduinoJoystickLibrary/tree/version-2.0
 
 // Debug
 // If debug is defined, the averaged but not mapped values are
@@ -22,7 +24,7 @@ enum inputs {
 };
 // The sensor inputs:
 // steeringWheel, throttle, break
-static const uint8_t sensors[] = {1, 2, 0};
+static const uint8_t sensors[3] = {1, 2, 0};
 static const uint8_t pingOut = 5;
 
 // The maximum and minimum of of the input values
@@ -30,7 +32,7 @@ static const uint8_t pingOut = 5;
 // WARNING: If the input value is bigger or smaller than the max values,
 //          the map function wraps around. Be sure to test properly and
 //          ideally have a bit of wiggle room
-static const uint32_t calibrationIn[sizeof(sensors)][2] = {
+static const uint16_t calibrationIn[sizeof(sensors)][2] = {
 	// Values for the steering wheel
 	{1500, 3900},
 	// Values for the throttle pedal
@@ -64,18 +66,43 @@ void setup() {
 	}
 }
 
-uint32_t readSensor(enum inputs id) {
+uint16_t *readSensor(void) {
+	uint16_t timeout = 6000;
+	uint32_t timeout_begin = 0;
+	uint16_t static time[3] = {0, 0, 0};
+	uint16_t begin[3] = {0, 0, 0};
+
 	// Start the measurment with a pulse to pingOut
 	digitalWrite(pingOut, HIGH);
 	delayMicroseconds(50);
 	digitalWrite(pingOut, LOW);
-	return pulseIn(sensors[id], HIGH, 6000);
+	// Begin Timeout
+	timeout_begin = micros();
+	// Stop when either all sensors have been measures or the timeout was reached
+	while((time[0] == 0 || time[1] == 0 || time[2] == 0) && ((micros() - timeout_begin) < timeout)) {
+		if (begin[0] == 0 && digitalRead(sensors[0]) == true) {
+			begin[0] = micros();
+		} else if (begin[0] == 0 && time[0] == 0 && digitalRead(sensors[0]) == false) {
+			time[0] = micros() - begin[0];
+		}
+		if (begin[1] == 0 && digitalRead(sensors[1]) == true) {
+			begin[1] = micros();
+		} else if (begin[1] == 0 && time[1] == 0 && digitalRead(sensors[1]) == false) {
+			time[1] = micros() - begin[1];
+		}
+		if (begin[2] == 0 && digitalRead(sensors[2]) == true) {
+			begin[2] = micros();
+		} else if (begin[2] == 0 && time[2] == 0 && digitalRead(sensors[2]) == false) {
+			time[2] = micros() - begin[2];
+		}
+	}
+	return time;
 }
 
 // Avrage and convert the data
-byte processSensor(enum inputs id, uint32_t val) {
-	static uint32_t lastData[sizeof(sensors)];
-	uint32_t average = lastData[id] + val;
+byte processSensor(enum inputs id, uint16_t val) {
+	static uint16_t lastData[sizeof(sensors)];
+	uint16_t average = lastData[id] + val;
 	lastData[id] = val;
 	// Map the input values to the calibrated values
 	return map(average, calibrationIn[id][0], calibrationIn[id][1], calibrationOut[id][0], calibrationOut[id][1]);
@@ -88,14 +115,12 @@ void usbDelay(uint8_t val) {
 	DigiJoystick.delay(val);
 #endif
 }
+
 void loop() {
-	uint32_t steeringWheel =  readSensor(STEERINGWHEEL);
-	// The sensors don't like beeing activated so fast, so we just wait a bit
-	// This function also handles USB processing
-	usbDelay(5);
-	uint32_t throttlePedal = readSensor(THROTTLEPEDAL);
-	usbDelay(5);
-	uint32_t breakPedal = readSensor(BREAKPEDAL);
+	uint16_t *measurments = readSensor();
+	uint16_t steeringWheel =  measurments[STEERINGWHEEL];
+	uint16_t throttlePedal = measurments[THROTTLEPEDAL];
+	uint16_t breakPedal = measurments[BREAKPEDAL];
 #ifdef debug
 	// As there isn't a serial port, just output debug data as a keyboard
 	// (gnuplot likes space seperated values)
@@ -105,12 +130,12 @@ void loop() {
 	DigiKeyboard.print(throttlePedal);
 	DigiKeyboard.print(" ");
 	DigiKeyboard.print(breakPedal);
-	usbDelay(200); // wait 200 milliseconds as we don't need the values that often
+	usbDelay(200); // Wait a bit longer than normal, so one can read the values
 #else
 	DigiJoystick.setX((byte)processSensor(STEERINGWHEEL, steeringWheel));
 	// throttle and break are on the same axis and can cancel each other out
 	DigiJoystick.setY((byte)(processSensor(THROTTLEPEDAL, throttlePedal) - processSensor(BREAKPEDAL, breakPedal)));
+#endif
 	// Can't hurt
 	usbDelay(20); // wait 20 milliseconds
-#endif
 }
