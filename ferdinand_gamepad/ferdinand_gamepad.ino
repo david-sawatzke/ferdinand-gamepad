@@ -176,7 +176,14 @@ uint16_t *readSensor(void) {
 	return time;
 }
 
-// Avrage and convert the data
+// A curve for the steering wheel
+// This needs to be adjusted if the output range changes
+uint16_t logSteering(uint16_t x) {
+	int16_t y = x - 512;
+	return constrain((sqrt(abs(y)) * 25 * (y / abs(y)))+512, 0, 1023);
+}
+
+// Average and convert the data
 uint16_t processSensor(enum sensorInputs id, uint16_t val) {
 	static uint16_t lastData[sizeof(sensors)];
 	uint16_t average = (lastData[id] + val)/ 2;
@@ -193,7 +200,7 @@ void handleSensors() {
 	uint16_t steeringWheel =  measurements[STEERINGWHEEL];
 	uint16_t throttlePedal = measurements[THROTTLEPEDAL];
 	uint16_t breakPedal = measurements[BREAKPEDAL];
-	Joystick.setXAxis(processSensor(STEERINGWHEEL, steeringWheel));
+	Joystick.setXAxis(logSteering(processSensor(STEERINGWHEEL, steeringWheel)));
 	// throttle and break are on the same axis and can cancel each other out
 	Joystick.setYAxis(processSensor(THROTTLEPEDAL, throttlePedal) - processSensor(BREAKPEDAL, breakPedal));
 	// We invert the button input, as it's pulled to GND when it's pressed
