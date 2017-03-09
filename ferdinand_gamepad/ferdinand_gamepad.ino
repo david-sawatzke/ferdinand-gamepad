@@ -28,9 +28,8 @@ static const uint8_t pingOut = 2;
 static const uint8_t button = 6;
 
 
-// The maximum and minimum of of the input values
-// These are so strange, because they first need to
-// filled by the calibrate function or values from the eeprom
+// The maximum and minimum of of the input value
+// The calibration values first need to filled by the calibrate function or from the eeprom
 uint16_t calibrationIn[sizeof(sensors)][2] = {
 	{UINT16_MAX, 0},
 	{UINT16_MAX, 0},
@@ -52,12 +51,11 @@ static const uint16_t calibrationOut[sizeof(sensors)][2] = {
 };
 
 void calibrate(void) {
-	Serial.println("CALIBRATION MODE");
 	// Wait until the button isn't pressed anymore
 	while(!digitalRead(button));
 	// Wait a bit, so we don't get bit by debouncing
 	delay(50);
-	//Output it again
+	// Start calibration routine
 	Serial.println("CALIBRATION MODE");
 	// Calibrate until the button is pressed
 	while(digitalRead(button)) {
@@ -73,10 +71,11 @@ void calibrate(void) {
 				if(measurements[i] < calibrationIn[i][0]) {
 					calibrationIn[i][0] = measurements[i];
 				}
-				// It could happen that it's both the maximum and the minimum
+				// The value could be both the maximum and the minimum
 				if(measurements[i] > calibrationIn[i][1]) {
 					calibrationIn[i][1] = measurements[i];
 				}
+				// Print the values for the operator
 				Serial.print(calibrationIn[i][0]);
 				Serial.print("\t");
 				Serial.print(calibrationIn[i][1]);
@@ -84,11 +83,12 @@ void calibrate(void) {
 			}
 		}
 	}
-	// After we are done getting the measurements, let's save the updated ones
+	// After being done getting the measurements, save the updated ones
 	// Iterate through the sensors
 	for(uint8_t i = 0; i < sizeof(sensors); i++) {
-		// If the higher Value has been set
-		// (the lower one would be set too)
+		// For testing purposes you can just calibrate with one sensor,
+		// so only update calibration values of pins where there were
+		// measurements, the higher value has been set
 		if (calibrationIn[i][1]) {
 			// We need 4 bytes of EEPROM for each sensor, as there are 2 values of 16 bits each
 			EEPROM[(i*4) + 0] = calibrationIn[i][0]  & 0xFF;
@@ -104,7 +104,7 @@ void setup() {
 	Joystick.begin();
 	// Set ping out to output
 	pinMode(pingOut, OUTPUT);
-	// Set the button as an input
+	// Set the button as an input with a pullup
 	pinMode(button, INPUT_PULLUP);
 	// Set the sensor inputs as an input
 	for (uint8_t i = 0; i < sizeof(sensors); i++) {
@@ -116,8 +116,6 @@ void setup() {
 	// Read the calibration values from the EEPROM
 	// Iterate through the sensors
 	for(uint8_t i = 0; i < sizeof(sensors); i++) {
-		// If the higher Value has been set
-		// (the lower one would be set too)
 		// We need 4 bytes of EEPROM for each sensor, as there are 2 values of 16 bits each
 		calibrationIn[i][0] = EEPROM[(i*4) + 0] | (EEPROM[(i*4) + 1] << 8);
 		calibrationIn[i][1] = EEPROM[(i*4) + 2] | (EEPROM[(i*4) + 3] << 8);
@@ -135,9 +133,15 @@ void setup() {
 	}
 }
 
+// This is just a reimplementation of pulseIn() for 3 inputs at the same time
+// digitalRead() isn't particularly fast, but it's fast enough here
 uint16_t *readSensor(void) {
-	uint16_t timeout = 8000;
+	// The timeout for the measurements
+	static const uint16_t timeout = 8000;
 	uint32_t timeout_begin = 0;
+	// This is the return array, so we can return a pointer
+	// Of course you can't use values of two measurments at the same time,
+	// as they'll be overwritten
 	uint16_t static time[3];
 	uint16_t begin[3] = {0, 0, 0};
 	time[0] = 0;
@@ -151,22 +155,29 @@ uint16_t *readSensor(void) {
 	timeout_begin = micros();
 	// Stop when either all sensors have been measured or the timeout was reached
 	while(((time[0] == 0) || (time[1] == 0) || (time[2] == 0)) && ((micros() - timeout_begin) < timeout)) {
+		// When no begin value has been recorded (so begin[0] isn't
+		// actually written twice) and there's a high pulse
 		if ((begin[0] == 0) && (digitalRead(sensors[0]) == true)) {
 			begin[0] = micros();
-		} else if ((begin[0] != 0) && (time[0] == 0 )&& (digitalRead(sensors[0]) == false)) {
+		}
+		// When a measurement has begun, but it hasn't ended yet and the
+		// pulse ends
+		else if ((begin[0] != 0) && (time[0] == 0) && (digitalRead(sensors[0]) == false)) {
 			time[0] = micros() - begin[0];
 		}
+		// Just refer to the comments of the first pin
 		if ((begin[1] == 0) && (digitalRead(sensors[1]) == true)) {
 			begin[1] = micros();
-		} else if ((begin[1] != 0) && (time[1] == 0 )&& (digitalRead(sensors[1]) == false)) {
+		} else if ((begin[1] != 0) && (time[1] == 0) && (digitalRead(sensors[1]) == false)) {
 			time[1] = micros() - begin[1];
 		}
 		if ((begin[2] == 0) && (digitalRead(sensors[2]) == true)) {
 			begin[2] = micros();
-		} else if ((begin[2] != 0) && (time[2] == 0 )&& (digitalRead(sensors[2]) == false)) {
+		} else if ((begin[2] != 0) && (time[2] == 0) && (digitalRead(sensors[2]) == false)) {
 			time[2] = micros() - begin[2];
 		}
 	}
+	// Just print the measurement data for debugging purposes
 	Serial.print("\r\nSensorRaw\t");
 	Serial.print(time[0]);
 	Serial.print("\t");
@@ -178,6 +189,22 @@ uint16_t *readSensor(void) {
 
 // A curve for the steering wheel
 // This needs to be adjusted if the output range changes
+// There may be curves that are better, the goal was just to get one like this:
+//                                  |              ----------------
+//                                  |        -----/
+//                                  |    /--/
+//                                  |  -/
+//                                  | /
+//                                  /
+//    ------------------------------|------------------------------
+//                                  /
+//                                / |
+//                              /-  |
+//                          /--/    |
+//                    /-----        |
+//    ----------------              |
+// That way it's pretty easy to steer when in the middle without much movement,
+// so you can steer faster
 uint16_t logSteering(uint16_t x) {
 	int16_t y = x - 512;
 	return constrain((sqrt(abs(y)) * 25 * (y / abs(y)))+512, 0, 1023);
@@ -185,7 +212,9 @@ uint16_t logSteering(uint16_t x) {
 
 // Average and convert the data
 uint16_t processSensor(enum sensorInputs id, uint16_t val) {
+	// As this is a static array, it survives when this function returns
 	static uint16_t lastData[sizeof(sensors)];
+	// Just average the last two values together
 	uint16_t average = (lastData[id] + val)/ 2;
 	lastData[id] = val;
 	// Constrain the data to the max cal values
