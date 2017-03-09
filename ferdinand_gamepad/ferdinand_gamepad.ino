@@ -15,12 +15,12 @@ Joystick_ Joystick(JOYSTICK_DEFAULT_REPORT_ID,
 // Inputs with an utrasonic sensor
 enum sensorInputs {
 	STEERINGWHEEL = 0,
-	THROTTLEPEDAL = 1,
+	GASPEDAL = 1,
 	BREAKPEDAL = 2
 };
 
 // The sensor inputs:
-// steeringWheel, throttlePedal, breakPedal
+// steeringWheel, gasPedal, breakPedal
 static const uint8_t sensors[3] = {3, 4, 5};
 static const uint8_t pingOut = 2;
 // The input for the button
@@ -41,12 +41,12 @@ uint16_t calibrationIn[sizeof(sensors)][2] = {
 static const uint16_t calibrationOut[sizeof(sensors)][2] = {
 	// Values for the steering wheel
 	{0, 1023},
-	// Values for the throttle pedal
-	// center the value when throttle isn't pressed
+	// Values for the gas pedal
+	// center the value when gas pedal isn't pressed
 	{512, 1023},
 	// Values for the break pedal
-	// Substract this values from throttle, so when it's fully
-	// pressed and throttle isn't, the resulting value is 0
+	// Substract this values from gas, so when it's fully
+	// pressed and the gas pedal isn't, the resulting value is 0
 	{0, 512}
 };
 
@@ -227,11 +227,11 @@ uint16_t processSensor(enum sensorInputs id, uint16_t val) {
 void handleSensors() {
 	uint16_t *measurements = readSensor();
 	uint16_t steeringWheel =  measurements[STEERINGWHEEL];
-	uint16_t throttlePedal = measurements[THROTTLEPEDAL];
+	uint16_t gasPedal = measurements[GASPEDAL];
 	uint16_t breakPedal = measurements[BREAKPEDAL];
 	Joystick.setXAxis(logSteering(processSensor(STEERINGWHEEL, steeringWheel)));
-	// throttle and break are on the same axis and can cancel each other out
-	Joystick.setYAxis(processSensor(THROTTLEPEDAL, throttlePedal) - processSensor(BREAKPEDAL, breakPedal));
+	// gas and break are on the same axis and can cancel each other out
+	Joystick.setYAxis(processSensor(GASPEDAL, gasPedal) - processSensor(BREAKPEDAL, breakPedal));
 	// We invert the button input, as it's pulled to GND when it's pressed
 	Joystick.setButton(0, !digitalRead(button));
 }
