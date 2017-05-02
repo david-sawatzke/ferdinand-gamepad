@@ -155,26 +155,22 @@ uint16_t *readSensor(void) {
 	timeout_begin = micros();
 	// Stop when either all sensors have been measured or the timeout was reached
 	while(((time[0] == 0) || (time[1] == 0) || (time[2] == 0)) && ((micros() - timeout_begin) < timeout)) {
-		// When no begin value has been recorded (so begin[0] isn't
-		// actually written twice) and there's a high pulse
-		if ((begin[0] == 0) && (digitalRead(sensors[0]) == true)) {
-			begin[0] = micros();
-		}
-		// When a measurement has begun, but it hasn't ended yet and the
-		// pulse ends
-		else if ((begin[0] != 0) && (time[0] == 0) && (digitalRead(sensors[0]) == false)) {
-			time[0] = micros() - begin[0];
-		}
-		// Just refer to the comments of the first pin
-		if ((begin[1] == 0) && (digitalRead(sensors[1]) == true)) {
-			begin[1] = micros();
-		} else if ((begin[1] != 0) && (time[1] == 0) && (digitalRead(sensors[1]) == false)) {
-			time[1] = micros() - begin[1];
-		}
-		if ((begin[2] == 0) && (digitalRead(sensors[2]) == true)) {
-			begin[2] = micros();
-		} else if ((begin[2] != 0) && (time[2] == 0) && (digitalRead(sensors[2]) == false)) {
-			time[2] = micros() - begin[2];
+		// As the measurement for all three sensors is the same, we can just use it in a for loop
+		for (uint8_t i = 0; i < 3; i ++) {
+			// When no begin value has been recorded (so begin[0] isn't
+			// actually written twice) and there's a high pulse
+			if (begin[i] == 0) {
+				if (digitalRead(sensors[i]) == true) {
+					begin[i] = micros();
+				}
+			}
+			// When a measurement has begun, but it hasn't ended yet and the
+			// pulse ends
+			else if (time[i] == 0) {
+				if (digitalRead(sensors[i]) == false) {
+					time[i] = micros() - begin[i];
+				}
+			}
 		}
 	}
 	// Just print the measurement data for debugging purposes
